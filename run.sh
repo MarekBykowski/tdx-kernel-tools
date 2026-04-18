@@ -1,5 +1,4 @@
 #!/bin/bash
-set -e
 
 use_git_sha=false
 
