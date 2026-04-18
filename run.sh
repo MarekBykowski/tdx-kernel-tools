@@ -1,5 +1,6 @@
 #!/bin/bash
 
+set -x
 use_git_sha=false
 
 scripts/config --disable LOCALVERSION_AUTO
@@ -20,8 +21,15 @@ fi
 
 fakeroot make -j10 LOCALVERSION="$SUFFIX"
 
-#sudo make modules_install
-#sudo make install
+if [[ $1 == install ]]; then
+	sudo make modules_install
+	sudo make install
+fi
 
 KERNEL_RELEASE=$(cat include/config/kernel.release)
 echo "Kernel release is: $KERNEL_RELEASE"
+if [[ $f == install ]]; then
+	echo "Kernel installed in grub and populated to /boot"
+else
+	echo "Kernel only built but not installed"
+fi
