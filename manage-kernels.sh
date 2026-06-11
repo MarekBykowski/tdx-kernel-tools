@@ -9,7 +9,7 @@ list_kernels() {
         marker=""
         if [[ "$k" == "$current" ]]; then
 		echo -e "  $k\t\t\t\t<- default"
-	else 
+	else
 		echo "  $k"
 	fi
     done
@@ -50,6 +50,36 @@ remove_kernel() {
     fi
 }
 
+build_kernel() {
+    local do_install="$1"
+    local SUFFIX=-tdx-io-remote-rootport
+    local use_git_sha=false
+
+    scripts/config --disable LOCALVERSION_AUTO
+    make olddefconfig
+
+    if [[ "$use_git_sha" == "true" ]]; then
+        SHA=$(git rev-parse --short HEAD)
+        SUFFIX="${SUFFIX}-${SHA}"
+    fi
+
+    fakeroot make -j10 LOCALVERSION="$SUFFIX"
+
+    if [[ "$do_install" == "install" ]]; then
+        sudo make modules_install
+        sudo make install
+    fi
+
+    local KERNEL_RELEASE
+    KERNEL_RELEASE=$(cat include/config/kernel.release)
+    echo "Kernel release is: $KERNEL_RELEASE"
+    if [[ "$do_install" == "install" ]]; then
+        echo "Kernel installed in grub and populated to /boot"
+    else
+        echo "Kernel only built but not installed"
+    fi
+}
+
 misc() {
 cat <<-'EOF'
 echo "List kernel menu entries"
@@ -75,6 +105,9 @@ case "$1" in
     list|remove)
         remove_kernel "$1" "$2"
         ;;
+    build)
+        build_kernel "$2"
+        ;;
     misc)
         misc
         ;;
@@ -83,6 +116,8 @@ case "$1" in
         echo "  $0 list-all"
         echo "  $0 list <version>"
         echo "  $0 remove <version>"
+        echo "  $0 build          # build only"
+        echo "  $0 build install  # build and install"
         echo "  $0 misc"
         ;;
 esac
