@@ -3,11 +3,14 @@
 
 list_kernels() {
     current=$(uname -r)
-    default=$(sudo grubby --default-kernel | sed 's|.*/vmlinuz-||; s|"||')
+    #default=$(sudo grubby --default-kernel | sed 's|.*/vmlinuz-||; s|"||g')
 
-    for k in $(sudo grubby --info=ALL | grep '^kernel=' | sed 's|.*/vmlinuz-||; s|"||'); do
+    #kernel="/boot/vmlinuz-6.6.0-tdx-io-test-ready" -> /boot/vmlinuz-6.6.0-tdx-io-test-ready
+    default=$(sudo grubby --default-kernel | sed 's|^kernel=||; s|"||g')
+
+    for k in $(sudo grubby --info=ALL | grep '^kernel=' | sed 's|^kernel=||; s|"||g'); do
         marker=""
-        if [[ "$k" == "$current" ]]; then
+        if [[ "$k" =~ "$current" ]]; then
 		echo -e "  $k\t\t\t\t<- default"
 	else
 		echo "  $k"
@@ -80,6 +83,37 @@ build_kernel() {
     fi
 }
 
+check_grubby() {
+    if ! command -v grubby &>/dev/null; then
+        echo "grubby not found"
+        return 1
+    fi
+}
+
+set_default_kernel() {
+    check_grubby || return 1
+
+    local version
+    version=$(cat include/config/kernel.release)
+
+    sudo grubby --set-default /boot/vmlinuz-"${version}" 1>/dev/null 2>&1
+    echo "Default kernel set to: $(sudo grubby --default-kernel)"
+}
+
+set_cmdline() {
+    check_grubby || return 1
+
+    local version
+    version=$(cat include/config/kernel.release)
+
+    local kernel="/boot/vmlinuz-${version}"
+    local cmdline="ro resume=/dev/mapper/cs_gnr--jf04--5350-swap rd.lvm.lv=cs_gnr-jf04-5350/root rd.lvm.lv=cs_gnr-jf04-5350/swap rhgb quiet selinux=0 console=tty0 console=ttyS0,115200n8 earlyprintk=ttyS0,115200 intel_iommu=on,sm_on numa_balancing=disable tsc=recalibrate tdxio ${tuned_params} crashkernel=6G panic=30"
+
+    sudo grubby --update-kernel="$kernel" --args="$cmdline" 1>/dev/null 2>&1
+    echo "Cmdline set for: $kernel"
+    echo "$cmdline"
+}
+
 misc() {
 cat <<-'EOF'
 echo "List kernel menu entries"
@@ -108,6 +142,12 @@ case "$1" in
     build)
         build_kernel "$2"
         ;;
+    set-default)
+        set_default_kernel
+        ;;
+    set-cmdline)
+        set_cmdline
+        ;;
     misc)
         misc
         ;;
@@ -116,6 +156,8 @@ case "$1" in
         echo "  $0 list-all"
         echo "  $0 list <version>"
         echo "  $0 remove <version>"
+        echo "  $0 set-default    # set default to kernel from include/config/kernel.release"
+        echo "  $0 set-cmdline    # set kernel cmdline for kernel from include/config/kernel.release"
         echo "  $0 build          # build only"
         echo "  $0 build install  # build and install"
         echo "  $0 misc"
