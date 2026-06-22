@@ -11,6 +11,8 @@ list_kernels() {
     for k in $(sudo grubby --info=ALL | grep '^kernel=' | sed 's|^kernel=||; s|"||g'); do
         marker=""
         if [[ "$k" =~ "$current" ]]; then
+		echo -e "  $k\t\t\t\t<- current"
+	elif [[ $k =~ "$default" ]]; then
 		echo -e "  $k\t\t\t\t<- default"
 	else
 		echo "  $k"
@@ -55,8 +57,8 @@ remove_kernel() {
 
 build_kernel() {
     local do_install="$1"
-    local SUFFIX=-tdx-io-remote-rootport
-    local use_git_sha=false
+    local SUFFIX=-tdx-io-enum
+    local use_git_sha=true
 
     scripts/config --disable LOCALVERSION_AUTO
     make olddefconfig
